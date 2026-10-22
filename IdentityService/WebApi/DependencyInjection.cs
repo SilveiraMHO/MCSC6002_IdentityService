@@ -108,10 +108,11 @@ namespace WebApi
                             }
                             else
                             {
-                                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                                // Bad signature, wrong algorithm, malformed token: client error, not server error.
+                                context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
                                 context.Response.ContentType = "application/json";
 
-                                var result = JsonSerializer.Serialize(ResponseWrapper.Fail("An unhandled error has occured."));
+                                var result = JsonSerializer.Serialize(ResponseWrapper.Fail("Invalid token."));
 
                                 return context.Response.WriteAsync(result);
                             }
