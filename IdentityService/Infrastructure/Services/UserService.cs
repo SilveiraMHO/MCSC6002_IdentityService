@@ -5,6 +5,7 @@ using Infrastructure.Models;
 using Mapster;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using ResponseLibrary.Models.Requests.Identity;
 using ResponseLibrary.Models.Responses.Identity;
 using ResponseLibrary.Models.Responses.Identity.ViewModelHelper;
@@ -17,11 +18,13 @@ namespace Infrastructure.Services
     {
         private readonly UserManager<ApplicationUser> _userManage;
         private readonly RoleManager<ApplicationRole> _roleManage;
+        private readonly IConfiguration _configuration;
 
-        public UserService(UserManager<ApplicationUser> userManager, RoleManager<ApplicationRole> roleManager)
+        public UserService(UserManager<ApplicationUser> userManager, RoleManager<ApplicationRole> roleManager, IConfiguration configuration)
         {
             _userManage = userManager;
             _roleManage = roleManager;
+            _configuration = configuration;
         }
 
         public async Task<IResponseWrapper> ChangeUserPasswordAsync(ChangeUserPasswordRequest userPasswordChange)
@@ -209,7 +212,7 @@ namespace Infrastructure.Services
             if (userDb is not null)
             {
                 //Safeguard: to prevent changing roles of the main admin user.
-                if (userDb.Email == AppCredentials.AdminUserEmail)
+                if (userDb.Email == _configuration["SeedCredentials:AdminEmail"])
                 {
                     return await ResponseWrapper.FailAsync("Cannot change roles of the main admin user.");
                 }

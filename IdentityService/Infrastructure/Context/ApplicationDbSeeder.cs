@@ -3,6 +3,7 @@ using Infrastructure.Constants;
 using Infrastructure.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace Infrastructure.Context
 {
@@ -11,12 +12,14 @@ namespace Infrastructure.Context
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<ApplicationRole> _roleManager;
         private readonly ApplicationDbContext _context;
+        private readonly IConfiguration _configuration;
 
-        public ApplicationDbSeeder(UserManager<ApplicationUser> userManager, RoleManager<ApplicationRole> roleManager, ApplicationDbContext context)
+        public ApplicationDbSeeder(UserManager<ApplicationUser> userManager, RoleManager<ApplicationRole> roleManager, ApplicationDbContext context, IConfiguration configuration)
         {
             _userManager = userManager;
             _roleManager = roleManager;
             _context = context;
+            _configuration = configuration;
         }
 
         public async Task SeedIdentityDatabaseAsync()
@@ -37,8 +40,8 @@ namespace Infrastructure.Context
 
         private async Task SeedAdminUserAsync()
         {
-            string adminEmail = AppCredentials.AdminUserEmail;
-            string adminPassword = AppCredentials.AdminUserPassword;
+            string adminEmail = _configuration["SeedCredentials:AdminEmail"];
+            string adminPassword = _configuration["SeedCredentials:AdminPassword"];
 
             var user = new ApplicationUser
             {
@@ -72,8 +75,8 @@ namespace Infrastructure.Context
 
         private async Task SeedBasicUserAsync()
         {
-            string basicEmail = AppCredentials.BasicUserEmail;
-            string basicPassword = AppCredentials.BasicUserPassword;
+            string basicEmail = _configuration["SeedCredentials:BasicEmail"];
+            string basicPassword = _configuration["SeedCredentials:BasicPassword"];
 
             var user = new ApplicationUser
             {
