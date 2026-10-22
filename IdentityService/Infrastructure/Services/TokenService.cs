@@ -12,7 +12,6 @@ using ResponseLibrary.Wrappers.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
-using System.Text;
 
 namespace Infrastructure.Services
 {
@@ -21,12 +20,14 @@ namespace Infrastructure.Services
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<ApplicationRole> _roleManager;
         private readonly TokenSettings _tokenSettings;
+        private readonly RsaSecurityKey _signingKey;
 
-        public TokenService(UserManager<ApplicationUser> userManager, RoleManager<ApplicationRole> roleManager, IOptions<TokenSettings> tokenSettings)
+        public TokenService(UserManager<ApplicationUser> userManager, RoleManager<ApplicationRole> roleManager, IOptions<TokenSettings> tokenSettings, RsaSecurityKey signingKey)
         {
             _userManager = userManager;
             _roleManager = roleManager;
             _tokenSettings = tokenSettings.Value;
+            _signingKey = signingKey;
         }
 
         public async Task<IResponseWrapper> GetTokenAsync(TokenRequest tokenRequest)
@@ -80,7 +81,13 @@ namespace Infrastructure.Services
         public async Task<IResponseWrapper> GetRefreshTokenAsync(RefreshTokenRequest refreshTokenRequest)
         {
             var userPrincipal = GetClaimPrincipalFromExpiredToken(refreshTokenRequest.Token);
-            var userEmail = userPrincipal.FindFirstValue(ClaimTypes.Email);
+            var userEmail = userPrincipal?.FindFirstValue(ClaimTypes.Email);
+
+            // Bad signature, wrong algorithm, malformed token or missing email claim.
+            if (string.IsNullOrEmpty(userEmail))
+            {
+                return await ResponseWrapper.FailAsync("Invalid token provided.");
+            }
 
             var userDb = await _userManager.FindByEmailAsync(userEmail);
 
@@ -154,9 +161,7 @@ namespace Infrastructure.Services
 
         private SigningCredentials GetSigningCredentials()
         {
-            var secret = Encoding.UTF8.GetBytes(_tokenSettings.Secret);
-
-            return new SigningCredentials(new SymmetricSecurityKey(secret), SecurityAlgorithms.HmacSha256);
+            return new SigningCredentials(_signingKey, SecurityAlgorithms.RsaSha256);
         }
 
         private string GenerateEncryptedToken(SigningCredentials signingCredentials, IEnumerable<Claim> claims)
@@ -181,6 +186,7 @@ namespace Infrastructure.Services
             return token;
         }
 
+        // Returns null when the token is not valid (instead of throwing and causing a 500).
         private ClaimsPrincipal GetClaimPrincipalFromExpiredToken(string expiredToken)
         {
             var tokenValidationParms = new TokenValidationParameters
@@ -188,24 +194,25 @@ namespace Infrastructure.Services
                 ValidateIssuerSigningKey = true,
                 ValidateIssuer = true,
                 ValidateAudience = true,
-                ValidateLifetime = true,
+                ValidateLifetime = false, // The access token is expected to be expired here; signature, issuer and audience are still checked.
                 ValidIssuer = AppClaim.Issuer,
                 ValidAudience = AppClaim.Audience,
                 RoleClaimType = ClaimTypes.Role,
                 ClockSkew = TimeSpan.Zero,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_tokenSettings.Secret))
+                IssuerSigningKey = _signingKey,
+                ValidAlgorithms = [SecurityAlgorithms.RsaSha256]
             };
 
             var tokenHanlder = new JwtSecurityTokenHandler();
 
-            var principal = tokenHanlder.ValidateToken(expiredToken, tokenValidationParms, out var securityToken);
-
-            if (securityToken is not JwtSecurityToken jwtSecurityToken || !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
+            try
             {
-                throw new SecurityTokenException("Invalid Token");
+                return tokenHanlder.ValidateToken(expiredToken, tokenValidationParms, out _);
             }
-
-            return principal;
+            catch (Exception ex) when (ex is SecurityTokenException or ArgumentException) // ArgumentException covers null/malformed tokens.
+            {
+                return null;
+            }
         }
         #endregion
     }

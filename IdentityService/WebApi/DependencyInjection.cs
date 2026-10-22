@@ -11,7 +11,7 @@ using ResponseLibrary.Wrappers;
 using System.Net;
 using System.Reflection;
 using System.Security.Claims;
-using System.Text;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace WebApi
@@ -60,7 +60,13 @@ namespace WebApi
 
         internal static IServiceCollection AddJwtAuthentication(this IServiceCollection services, TokenSettings tokenSettings)
         {
-            var secretInBytes = Encoding.ASCII.GetBytes(tokenSettings.Secret);
+            // RS256: only this service holds the private key, so only it can sign tokens.
+            // Other services validate with the public key (keys/jwt-public.pem).
+            var rsa = RSA.Create();
+            rsa.ImportFromPem(File.ReadAllText(tokenSettings.PrivateKeyPath));
+            var signingKey = new RsaSecurityKey(rsa);
+
+            services.AddSingleton(signingKey); // Used by TokenService to sign.
 
             services
                 .AddAuthentication(auth =>
@@ -82,7 +88,8 @@ namespace WebApi
                         ValidAudience = AppClaim.Audience,
                         RoleClaimType = ClaimTypes.Role,
                         ClockSkew = TimeSpan.Zero,
-                        IssuerSigningKey = new SymmetricSecurityKey(secretInBytes)
+                        IssuerSigningKey = signingKey,
+                        ValidAlgorithms = [SecurityAlgorithms.RsaSha256]
                     };
 
                     // If the validations above failed for some how, it will happen:
