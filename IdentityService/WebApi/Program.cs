@@ -24,21 +24,20 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     await app.SeedDatabase();
-}
-
-app.MapOpenApi();
-app.MapScalarApiReference(options =>
-{
-    options.Title = "Identity Service";
-    options.DarkMode = true;
-    options.DefaultHttpClient = new(ScalarTarget.CSharp, ScalarClient.HttpClient);
-    options.CustomCss = "";
-    options.AddPreferredSecuritySchemes("Bearer")
-    .AddHttpAuthentication("Bearer", auth =>
+    app.MapOpenApi();
+    app.MapScalarApiReference(options =>
     {
-        auth.Token = null;
+        options.Title = "Identity Service";
+        options.DarkMode = true;
+        options.DefaultHttpClient = new(ScalarTarget.CSharp, ScalarClient.HttpClient);
+        options.CustomCss = "";
+        options.AddPreferredSecuritySchemes("Bearer")
+        .AddHttpAuthentication("Bearer", auth =>
+        {
+            auth.Token = null;
+        });
     });
-});
+}
 
 app.UseHttpsRedirection();
 app.UseRouting();
