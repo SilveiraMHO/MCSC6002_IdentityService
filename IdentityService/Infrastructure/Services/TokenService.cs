@@ -33,15 +33,13 @@ namespace Infrastructure.Services
         public async Task<IResponseWrapper> GetTokenAsync(TokenRequest tokenRequest)
         {
             #region Validations
-            // Check user name.
             var userDb = await _userManager.FindByNameAsync(tokenRequest.UserName);
             if (userDb is null)
             {
                 return await ResponseWrapper.FailAsync("Invalid credentials.");
             }
 
-            // Check lockout, then password. Same message for every failure so an attacker
-            // can't tell a locked account from a wrong password.
+            // Same message for every failure: locked and wrong password look alike.
             if (await _userManager.IsLockedOutAsync(userDb))
             {
                 return await ResponseWrapper.FailAsync("Invalid credentials.");
@@ -50,19 +48,17 @@ namespace Infrastructure.Services
             var isPasswordValid = await _userManager.CheckPasswordAsync(userDb, tokenRequest.Password);
             if (!isPasswordValid)
             {
-                await _userManager.AccessFailedAsync(userDb); // Locks the account after Lockout.MaxFailedAccessAttempts.
+                await _userManager.AccessFailedAsync(userDb); // Lockout after MaxFailedAccessAttempts.
                 return await ResponseWrapper.FailAsync("Invalid credentials.");
             }
 
             await _userManager.ResetAccessFailedCountAsync(userDb);
 
-            // Check if Active.
             if (!userDb.IsActive)
             {
                 return await ResponseWrapper.FailAsync("User not active. Please, contact the Administrator.");
             }
 
-            // Check email confirmed.
             if (!userDb.EmailConfirmed)
             {
                 return await ResponseWrapper.FailAsync("Email not confirmed.");
@@ -74,7 +70,6 @@ namespace Infrastructure.Services
 
             await _userManager.UpdateAsync(userDb);
 
-            // Generate AuthToken.
             var token = await GenerateJwtAsync(userDb);
 
             var tokenResponse = new TokenResponse
@@ -92,7 +87,7 @@ namespace Infrastructure.Services
             var userPrincipal = GetClaimPrincipalFromExpiredToken(refreshTokenRequest.Token);
             var userEmail = userPrincipal?.FindFirstValue(ClaimTypes.Email);
 
-            // Bad signature, wrong algorithm, malformed token or missing email claim.
+            // Invalid token or no email claim.
             if (string.IsNullOrEmpty(userEmail))
             {
                 return await ResponseWrapper.FailAsync("Invalid token provided.");
@@ -195,7 +190,7 @@ namespace Infrastructure.Services
             return token;
         }
 
-        // Returns null when the token is not valid (instead of throwing and causing a 500).
+        // null on invalid token, not a 500.
         private ClaimsPrincipal GetClaimPrincipalFromExpiredToken(string expiredToken)
         {
             var tokenValidationParms = new TokenValidationParameters
@@ -203,7 +198,7 @@ namespace Infrastructure.Services
                 ValidateIssuerSigningKey = true,
                 ValidateIssuer = true,
                 ValidateAudience = true,
-                ValidateLifetime = false, // The access token is expected to be expired here; signature, issuer and audience are still checked.
+                ValidateLifetime = false, // Expected expired; signature, issuer, audience still checked.
                 ValidIssuer = AppClaim.Issuer,
                 ValidAudience = AppClaim.Audience,
                 RoleClaimType = ClaimTypes.Role,
@@ -218,7 +213,7 @@ namespace Infrastructure.Services
             {
                 return tokenHanlder.ValidateToken(expiredToken, tokenValidationParms, out _);
             }
-            catch (Exception ex) when (ex is SecurityTokenException or ArgumentException) // ArgumentException covers null/malformed tokens.
+            catch (Exception ex) when (ex is SecurityTokenException or ArgumentException) // Argument: null or malformed token.
             {
                 return null;
             }

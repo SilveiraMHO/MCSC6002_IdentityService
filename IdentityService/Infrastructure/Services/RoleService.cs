@@ -59,7 +59,7 @@ namespace Infrastructure.Services
 
             if (roleDb is not null)
             {
-                // Prevent deletion of the Admin role. this approach prevents deletion of basic roles as well, it is a necessary trade-off to ensure the security of the application.
+                // Admin role can't be deleted.
                 if (roleDb.Name != AppRoles.Admin)
                 {
                     var allUsersDb = await _userManager.Users.ToListAsync();
@@ -109,10 +109,8 @@ namespace Infrastructure.Services
 
                 var currentAssignedClaims = await GetAllClaimsForRoleAsync(roleId);
 
-                // List of all permission names: e.g. "Permission.Identity.User.Create"...
                 var allPermissionNames = allPermissions.Select(p => p.Name).ToList();
 
-                // List of currently assigned claim values: e.g. "Permission.Identity.User.Create"...
                 var currentAssignedClaimValues = currentAssignedClaims.Select(rc => rc.ClaimValue).ToList();
 
                 var currentAssignedRoleClaimsNames = allPermissionNames.Intersect(currentAssignedClaimValues).ToList();
@@ -219,13 +217,11 @@ namespace Infrastructure.Services
 
                 var currentAssignedPermissions = await _roleManager.GetClaimsAsync(roleDb);
 
-                //Dropping
                 foreach (var claim in currentAssignedPermissions)
                 {
                     await _roleManager.RemoveClaimAsync(roleDb, claim);
                 }
 
-                //Lifting
                 var mappedRoleClaims = permissionsToBeAssigned.Adapt<List<ApplicationRoleClaim>>();
                 await _context.RoleClaims.AddRangeAsync(mappedRoleClaims);
                 await _context.SaveChangesAsync();

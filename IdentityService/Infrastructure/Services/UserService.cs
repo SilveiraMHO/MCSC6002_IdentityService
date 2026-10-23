@@ -160,12 +160,11 @@ namespace Infrastructure.Services
                 EmailConfirmed = userRegistration.AutoConfirmEmail
             };
 
-            // Passing the password lets Identity run its password policy before hashing it.
+            // With password: Identity enforces the password policy.
             var identityUserResult = await _userManage.CreateAsync(newUser, userRegistration.Password);
 
             if (identityUserResult.Succeeded)
             {
-                // Assign user to role(s).
                 var identityRoleResult = await _userManage.AddToRoleAsync(newUser, AppRoles.Basic);
 
                 if (identityRoleResult.Succeeded)
@@ -208,7 +207,7 @@ namespace Infrastructure.Services
 
             if (userDb is not null)
             {
-                //Safeguard: to prevent changing roles of the main admin user.
+                // Main admin's roles are fixed.
                 if (userDb.Email == _configuration["SeedCredentials:AdminEmail"])
                 {
                     return await ResponseWrapper.FailAsync("Cannot change roles of the main admin user.");

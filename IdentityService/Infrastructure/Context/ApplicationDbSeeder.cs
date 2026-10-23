@@ -38,7 +38,7 @@ namespace Infrastructure.Context
             }
         }
 
-        // Seed passwords come from user-secrets, never from committed config.
+        // From user-secrets.
         private string GetRequiredSetting(string key)
         {
             return _configuration[key] is { Length: > 0 } value
@@ -74,7 +74,6 @@ namespace Infrastructure.Context
 
             user = await _userManager.FindByEmailAsync(adminEmail);
 
-            // Assign role(s) to user
             if (!await _userManager.IsInRoleAsync(user, AppRoles.Basic) && !await _userManager.IsInRoleAsync(user, AppRoles.Admin))
             {
                 await _userManager.AddToRolesAsync(user, AppRoles.DefaultRoles);
@@ -109,7 +108,6 @@ namespace Infrastructure.Context
 
             user = await _userManager.FindByEmailAsync(basicEmail);
 
-            // Assign role(s) to user
             if (!await _userManager.IsInRoleAsync(user, AppRoles.Basic))
             {
                 await _userManager.AddToRoleAsync(user, AppRoles.Basic);
@@ -132,7 +130,6 @@ namespace Infrastructure.Context
                     await _roleManager.CreateAsync(role);
                 }
 
-                // Assign permissions to role.
                 if (roleName == AppRoles.Basic)
                 {
                     await AssignPermissionsToRoleAsync(role, AppPermissions.BasicPermissions);
