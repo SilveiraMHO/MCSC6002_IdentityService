@@ -38,10 +38,18 @@ namespace Infrastructure.Context
             }
         }
 
+        // Seed passwords come from user-secrets, never from committed config.
+        private string GetRequiredSetting(string key)
+        {
+            return _configuration[key] is { Length: > 0 } value
+                ? value
+                : throw new InvalidOperationException($"{key} is not configured. Set it with dotnet user-secrets (see MCSC6002_System/scripts).");
+        }
+
         private async Task SeedAdminUserAsync()
         {
             string adminEmail = _configuration["SeedCredentials:AdminEmail"];
-            string adminPassword = _configuration["SeedCredentials:AdminPassword"];
+            string adminPassword = GetRequiredSetting("SeedCredentials:AdminPassword");
 
             var user = new ApplicationUser
             {
@@ -76,7 +84,7 @@ namespace Infrastructure.Context
         private async Task SeedBasicUserAsync()
         {
             string basicEmail = _configuration["SeedCredentials:BasicEmail"];
-            string basicPassword = _configuration["SeedCredentials:BasicPassword"];
+            string basicPassword = GetRequiredSetting("SeedCredentials:BasicPassword");
 
             var user = new ApplicationUser
             {

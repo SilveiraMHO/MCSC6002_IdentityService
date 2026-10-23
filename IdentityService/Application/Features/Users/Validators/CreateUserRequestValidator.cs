@@ -33,8 +33,8 @@ namespace Application.Features.Users.Validators
                 .MaximumLength(20)
                 .NotEmpty();
             RuleFor(x => x.Password)
-                .MinimumLength(6)
-                .MaximumLength(20)
+                .MinimumLength(12) // Same as the Identity password policy.
+                .MaximumLength(128) // Allow passphrases; the cap only blocks oversized input.
                 .NotEmpty();
             RuleFor(x => x.PhoneNumber)
                 .MinimumLength(10)

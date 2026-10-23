@@ -160,11 +160,8 @@ namespace Infrastructure.Services
                 EmailConfirmed = userRegistration.AutoConfirmEmail
             };
 
-            // Create password hash.
-            var passwordHash = new PasswordHasher<ApplicationUser>();
-            newUser.PasswordHash = passwordHash.HashPassword(newUser, userRegistration.Password);
-
-            var identityUserResult = await _userManage.CreateAsync(newUser);
+            // Passing the password lets Identity run its password policy before hashing it.
+            var identityUserResult = await _userManage.CreateAsync(newUser, userRegistration.Password);
 
             if (identityUserResult.Succeeded)
             {

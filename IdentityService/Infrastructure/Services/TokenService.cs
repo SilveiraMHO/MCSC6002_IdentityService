@@ -40,12 +40,21 @@ namespace Infrastructure.Services
                 return await ResponseWrapper.FailAsync("Invalid credentials.");
             }
 
-            // Check password.
-            var isPasswordValid = await _userManager.CheckPasswordAsync(userDb, tokenRequest.Password);
-            if (!isPasswordValid)
+            // Check lockout, then password. Same message for every failure so an attacker
+            // can't tell a locked account from a wrong password.
+            if (await _userManager.IsLockedOutAsync(userDb))
             {
                 return await ResponseWrapper.FailAsync("Invalid credentials.");
             }
+
+            var isPasswordValid = await _userManager.CheckPasswordAsync(userDb, tokenRequest.Password);
+            if (!isPasswordValid)
+            {
+                await _userManager.AccessFailedAsync(userDb); // Locks the account after Lockout.MaxFailedAccessAttempts.
+                return await ResponseWrapper.FailAsync("Invalid credentials.");
+            }
+
+            await _userManager.ResetAccessFailedCountAsync(userDb);
 
             // Check if Active.
             if (!userDb.IsActive)

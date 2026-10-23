@@ -38,12 +38,19 @@ namespace WebApi
                 .AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>()
                 .AddIdentity<ApplicationUser, ApplicationRole>(options =>
                 {
-                    options.Password.RequiredLength = 6;
+                    // NIST SP 800-63B: length over composition rules.
+                    options.Password.RequiredLength = 12;
+                    options.Password.RequiredUniqueChars = 6;
                     options.Password.RequireDigit = false;
                     options.Password.RequireLowercase = false;
                     options.Password.RequireNonAlphanumeric = false;
                     options.Password.RequireUppercase = false;
                     options.User.RequireUniqueEmail = true;
+
+                    // Brute-force protection per account (complements the gateway's per-IP rate limit).
+                    options.Lockout.MaxFailedAccessAttempts = 5;
+                    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+                    options.Lockout.AllowedForNewUsers = true;
                 })
                 .AddEntityFrameworkStores<ApplicationDbContext>()
                 .AddDefaultTokenProviders();
