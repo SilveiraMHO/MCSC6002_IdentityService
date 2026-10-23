@@ -1,7 +1,9 @@
-﻿using Application.Features.Token.Queries;
+﻿using Application.Features.Token.Commands;
+using Application.Features.Token.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ResponseLibrary.Models.Requests.Identity;
+using System.Security.Claims;
 
 namespace WebApi.Controllers
 {
@@ -31,6 +33,24 @@ namespace WebApi.Controllers
             var response = await Sender.Send(new GetRefreshTokenQuery
             {
                 RefreshToken = request
+            });
+
+            if (response.IsSuccessful)
+            {
+                return Ok(response);
+            }
+
+            return BadRequest(response);
+        }
+
+        // Logout: refresh token stops working; access token expires on its own.
+        [HttpPost("revoke")]
+        [Authorize]
+        public async Task<IActionResult> RevokeAsync()
+        {
+            var response = await Sender.Send(new RevokeRefreshTokenCommand
+            {
+                UserId = User.FindFirstValue(ClaimTypes.NameIdentifier)
             });
 
             if (response.IsSuccessful)

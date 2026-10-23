@@ -7,5 +7,6 @@ namespace Application.Interfaces
     {
         Task<IResponseWrapper> GetTokenAsync(TokenRequest tokenRequest);
         Task<IResponseWrapper> GetRefreshTokenAsync(RefreshTokenRequest refreshTokenRequest);
+        Task<IResponseWrapper> RevokeRefreshTokenAsync(string userId);
     }
 }

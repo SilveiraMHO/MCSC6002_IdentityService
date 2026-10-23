@@ -12,6 +12,7 @@ using ResponseLibrary.Wrappers.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text;
 
 namespace Infrastructure.Services
 {
@@ -65,7 +66,8 @@ namespace Infrastructure.Services
             }
             #endregion
 
-            userDb.RefreshToken = GenerateRefreshToken();
+            var refreshToken = GenerateRefreshToken();
+            userDb.RefreshToken = HashRefreshToken(refreshToken);
             userDb.RefreshTokenExpirationDate = DateTime.Now.AddDays(_tokenSettings.RefreshTokenExpireInDays);
 
             await _userManager.UpdateAsync(userDb);
@@ -75,7 +77,7 @@ namespace Infrastructure.Services
             var tokenResponse = new TokenResponse
             {
                 Token = token,
-                RefreshToken = userDb.RefreshToken,
+                RefreshToken = refreshToken,
                 RefreshTokenExpireTime = userDb.RefreshTokenExpirationDate
             };
 
@@ -97,14 +99,15 @@ namespace Infrastructure.Services
 
             if (userDb is not null)
             {
-                if (userDb.RefreshToken != refreshTokenRequest.RefreshToken || userDb.RefreshTokenExpirationDate <= DateTime.Now)
+                if (!IsRefreshTokenValid(refreshTokenRequest.RefreshToken, userDb.RefreshToken) || userDb.RefreshTokenExpirationDate <= DateTime.Now)
                 {
                     return await ResponseWrapper.FailAsync("Invalid token provided.");
                 }
 
                 var token = GenerateEncryptedToken(GetSigningCredentials(), await GetClaimsAsync(userDb));
 
-                userDb.RefreshToken = GenerateRefreshToken();
+                var refreshToken = GenerateRefreshToken();
+                userDb.RefreshToken = HashRefreshToken(refreshToken);
                 userDb.RefreshTokenExpirationDate = DateTime.Now.AddDays(_tokenSettings.RefreshTokenExpireInDays);
 
                 await _userManager.UpdateAsync(userDb);
@@ -112,7 +115,7 @@ namespace Infrastructure.Services
                 var tokenResponse = new TokenResponse
                 {
                     Token = token,
-                    RefreshToken = userDb.RefreshToken,
+                    RefreshToken = refreshToken,
                     RefreshTokenExpireTime = userDb.RefreshTokenExpirationDate
                 };
 
@@ -122,6 +125,23 @@ namespace Infrastructure.Services
             return await ResponseWrapper.FailAsync("User not found.");
         }
 
+        public async Task<IResponseWrapper> RevokeRefreshTokenAsync(string userId)
+        {
+            var userDb = await _userManager.FindByIdAsync(userId);
+
+            if (userDb is null)
+            {
+                return await ResponseWrapper.FailAsync("User not found.");
+            }
+
+            userDb.RefreshToken = null;
+            userDb.RefreshTokenExpirationDate = DateTime.MinValue;
+
+            await _userManager.UpdateAsync(userDb);
+
+            return await ResponseWrapper.SuccessAsync("Refresh token revoked.");
+        }
+
         #region Private Methods
         private static string GenerateRefreshToken()
         {
@@ -129,6 +149,22 @@ namespace Infrastructure.Services
             using var rng = RandomNumberGenerator.Create();
             rng.GetBytes(randomNumber);
             return Convert.ToBase64String(randomNumber);
+        }
+
+        // DB holds only the SHA-256: a DB leak gives no usable refresh tokens.
+        private static string HashRefreshToken(string refreshToken)
+        {
+            return Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken)));
+        }
+
+        private static bool IsRefreshTokenValid(string refreshToken, string storedHash)
+        {
+            if (string.IsNullOrEmpty(refreshToken) || string.IsNullOrEmpty(storedHash))
+            {
+                return false;
+            }
+
+            return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(HashRefreshToken(refreshToken)), Encoding.UTF8.GetBytes(storedHash));
         }
 
         private async Task<IEnumerable<Claim>> GetClaimsAsync(ApplicationUser user)
