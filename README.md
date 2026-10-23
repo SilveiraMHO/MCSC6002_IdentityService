@@ -11,3 +11,7 @@ openssl pkey -in keys/jwt-private.pem -pubout -out keys/jwt-public.pem
 ```
 
 Only this service gets `jwt-private.pem` (`TokenSettings:PrivateKeyPath`). The gateway and other services get `jwt-public.pem`.
+
+## Shared libraries
+
+AuthLibrary and ResponseLibrary are bundled in `nuget-local/` (their GitHub Packages feed requires a login). `nuget.config` maps both names to that folder only, because nuget.org hosts unrelated packages with the same names.
