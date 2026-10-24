@@ -38,12 +38,12 @@ namespace Infrastructure.Context
             }
         }
 
-        // From user-secrets.
+        // From .env via docker-compose.
         private string GetRequiredSetting(string key)
         {
             return _configuration[key] is { Length: > 0 } value
                 ? value
-                : throw new InvalidOperationException($"{key} is not configured. Set it with dotnet user-secrets (see MCSC6002_System/scripts).");
+                : throw new InvalidOperationException($"{key} is not configured. Set it in MCSC6002_System/.env (see docker-compose.yml).");
         }
 
         private async Task SeedAdminUserAsync()

@@ -21,9 +21,13 @@ builder.Services.AddJwtAuthentication(builder.Services.GetTokenSettings(builder.
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+if (app.Configuration.GetValue<bool>("SeedDatabase")) // Migrations and seed users; docker-compose sets it.
 {
     await app.SeedDatabase();
+}
+
+if (app.Environment.IsDevelopment())
+{
     app.MapOpenApi();
     app.MapScalarApiReference(options =>
     {
